@@ -14,6 +14,25 @@ def load_data():
             return json.load(f)
     return {"notes": [], "dates": [], "timeline": [], "photos": [], "voices": []}
 
+def ensure_replies(data):
+    """Ensure all items have replies array for backwards compatibility"""
+    for photo in data.get('photos', []):
+        if isinstance(photo, dict) and 'replies' not in photo:
+            photo['replies'] = []
+    for note in data.get('notes', []):
+        if 'replies' not in note:
+            note['replies'] = []
+    for voice in data.get('voices', []):
+        if 'replies' not in voice:
+            voice['replies'] = []
+    for date in data.get('dates', []):
+        if 'replies' not in date:
+            date['replies'] = []
+    for event in data.get('timeline', []):
+        if 'replies' not in event:
+            event['replies'] = []
+    return data
+
 def commit_and_push():
     """Commit and push changes to GitHub"""
     try:
@@ -35,6 +54,7 @@ def main():
     st.title("jorge & aliah💕")
 
     data = load_data()
+    data = ensure_replies(data)
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Photos", "Notes", "Voice Messages", "Important Dates", "Timeline", "Shuffle Memory"])
 
@@ -45,7 +65,7 @@ def main():
             for uploaded_file in uploaded_files:
                 image_data = uploaded_file.getvalue()
                 encoded = base64.b64encode(image_data).decode('utf-8')
-                data['photos'].append({"name": uploaded_file.name, "data": encoded})
+                data['photos'].append({"name": uploaded_file.name, "data": encoded, "replies": []})
             save_data(data)
             st.success("Photos uploaded!")
 
@@ -59,22 +79,48 @@ def main():
                     decoded = base64.b64decode(photo['data'])
                     st.image(decoded, caption=photo['name'])
                 
-                if st.button("🗑️ Delete", key=f"delete_photo_{i}"):
-                    data['photos'].pop(i)
-                    save_data(data)
-                    st.rerun()
+                col_del, col_reply = st.columns(2)
+                with col_del:
+                    if st.button("🗑️", key=f"delete_photo_{i}"):
+                        data['photos'].pop(i)
+                        save_data(data)
+                        st.rerun()
+                with col_reply:
+                    if st.button("💬", key=f"reply_photo_{i}"):
+                        st.session_state[f"reply_photo_{i}"] = not st.session_state.get(f"reply_photo_{i}", False)
+                
+                if st.session_state.get(f"reply_photo_{i}", False):
+                    reply_text = st.text_input("Add a reply", key=f"reply_input_photo_{i}")
+                    if st.button("Send Reply", key=f"send_reply_photo_{i}"):
+                        if reply_text:
+                            photo['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                            save_data(data)
+                            st.rerun()
+                
+                if photo.get('replies', []):
+                    st.caption("Replies:")
+                    for j, reply in enumerate(photo['replies']):
+                        col1, col2 = st.columns([0.85, 0.15])
+                        with col1:
+                            st.write(f"💭 {reply['text']}")
+                            st.caption(f"_{reply['date']}_")
+                        with col2:
+                            if st.button("🗑️", key=f"delete_reply_photo_{i}_{j}"):
+                                photo['replies'].pop(j)
+                                save_data(data)
+                                st.rerun()
 
     with tab2:
         st.header("Notes")
         new_note = st.text_area("Add a new note")
         if st.button("Add Note"):
             if new_note:
-                data['notes'].append({"text": new_note, "date": str(datetime.now())})
+                data['notes'].append({"text": new_note, "date": str(datetime.now()), "replies": []})
                 save_data(data)
                 st.success("Note added!")
                 st.rerun()
 
-        st.subheader("Your Notes")
+        st.subheader("Notes")
         for i, note in enumerate(reversed(data['notes'])):
             col1, col2 = st.columns([0.9, 0.1])
             with col1:
@@ -84,6 +130,33 @@ def main():
                     data['notes'].pop(len(data['notes']) - 1 - i)
                     save_data(data)
                     st.rerun()
+            
+            note_idx = len(data['notes']) - 1 - i
+            col_reply, col_space = st.columns([0.15, 0.85])
+            with col_reply:
+                if st.button("💬", key=f"reply_note_{i}"):
+                    st.session_state[f"reply_note_{i}"] = not st.session_state.get(f"reply_note_{i}", False)
+            
+            if st.session_state.get(f"reply_note_{i}", False):
+                reply_text = st.text_input("Add a reply", key=f"reply_input_note_{i}")
+                if st.button("Send Reply", key=f"send_reply_note_{i}"):
+                    if reply_text:
+                        data['notes'][note_idx]['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                        save_data(data)
+                        st.rerun()
+            
+            if data['notes'][note_idx].get('replies', []):
+                st.caption("Replies:")
+                for j, reply in enumerate(data['notes'][note_idx]['replies']):
+                    col1, col2 = st.columns([0.85, 0.15])
+                    with col1:
+                        st.write(f"💭 {reply['text']}")
+                        st.caption(f"_{reply['date']}_")
+                    with col2:
+                        if st.button("🗑️", key=f"delete_reply_note_{i}_{j}"):
+                            data['notes'][note_idx]['replies'].pop(j)
+                            save_data(data)
+                            st.rerun()
             st.divider()
 
     with tab3:
@@ -92,34 +165,83 @@ def main():
         if uploaded_voice:
             audio_data = uploaded_voice.getvalue()
             encoded = base64.b64encode(audio_data).decode('utf-8')
-            data['voices'].append({"name": uploaded_voice.name, "data": encoded, "date": str(datetime.now())})
+            data['voices'].append({"name": uploaded_voice.name, "data": encoded, "date": str(datetime.now()), "replies": []})
             save_data(data)
             st.success("Voice message uploaded!")
 
         st.subheader("Voice Messages")
         for i, voice in enumerate(reversed(data['voices'])):
+            voice_idx = len(data['voices']) - 1 - i
             if isinstance(voice, dict) and 'data' in voice:
                 decoded = base64.b64decode(voice['data'])
                 st.audio(decoded, format='audio/mp3')
-                col1, col2 = st.columns([0.9, 0.1])
+                col1, col2, col3 = st.columns([0.8, 0.1, 0.1])
                 with col1:
                     st.write(f"Uploaded on: {voice['date']}")
                 with col2:
+                    if st.button("💬", key=f"reply_voice_{i}"):
+                        st.session_state[f"reply_voice_{i}"] = not st.session_state.get(f"reply_voice_{i}", False)
+                with col3:
                     if st.button("🗑️", key=f"delete_voice_{i}"):
-                        data['voices'].pop(len(data['voices']) - 1 - i)
+                        data['voices'].pop(voice_idx)
                         save_data(data)
                         st.rerun()
+                
+                if st.session_state.get(f"reply_voice_{i}", False):
+                    reply_text = st.text_input("Add a reply", key=f"reply_input_voice_{i}")
+                    if st.button("Send Reply", key=f"send_reply_voice_{i}"):
+                        if reply_text:
+                            data['voices'][voice_idx]['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                            save_data(data)
+                            st.rerun()
+                
+                if data['voices'][voice_idx].get('replies', []):
+                    st.caption("Replies:")
+                    for j, reply in enumerate(data['voices'][voice_idx]['replies']):
+                        col1, col2 = st.columns([0.85, 0.15])
+                        with col1:
+                            st.write(f"💭 {reply['text']}")
+                            st.caption(f"_{reply['date']}_")
+                        with col2:
+                            if st.button("🗑️", key=f"delete_reply_voice_{i}_{j}"):
+                                data['voices'][voice_idx]['replies'].pop(j)
+                                save_data(data)
+                                st.rerun()
             elif isinstance(voice, dict) and 'path' in voice:
                 if os.path.exists(voice['path']):
                     st.audio(voice['path'], format='audio/mp3')
-                    col1, col2 = st.columns([0.9, 0.1])
+                    col1, col2, col3 = st.columns([0.8, 0.1, 0.1])
                     with col1:
                         st.write(f"Uploaded on: {voice['date']}")
                     with col2:
+                        if st.button("💬", key=f"reply_voice_path_{i}"):
+                            st.session_state[f"reply_voice_path_{i}"] = not st.session_state.get(f"reply_voice_path_{i}", False)
+                    with col3:
                         if st.button("🗑️", key=f"delete_voice_path_{i}"):
-                            data['voices'].pop(len(data['voices']) - 1 - i)
+                            data['voices'].pop(voice_idx)
                             save_data(data)
                             st.rerun()
+                    
+                    if st.session_state.get(f"reply_voice_path_{i}", False):
+                        reply_text = st.text_input("Add a reply", key=f"reply_input_voice_path_{i}")
+                        if st.button("Send Reply", key=f"send_reply_voice_path_{i}"):
+                            if reply_text:
+                                data['voices'][voice_idx]['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                                save_data(data)
+                                st.rerun()
+                    
+                    if data['voices'][voice_idx].get('replies', []):
+                        st.caption("Replies:")
+                        for j, reply in enumerate(data['voices'][voice_idx]['replies']):
+                            col1, col2 = st.columns([0.85, 0.15])
+                            with col1:
+                                st.write(f"💭 {reply['text']}")
+                                st.caption(f"_{reply['date']}_")
+                            with col2:
+                                if st.button("🗑️", key=f"delete_reply_voice_path_{i}_{j}"):
+                                    data['voices'][voice_idx]['replies'].pop(j)
+                                    save_data(data)
+                                    st.rerun()
             st.divider()
 
     with tab4:
@@ -128,7 +250,7 @@ def main():
         desc = st.text_input("Description")
         if st.button("Add Date"):
             if desc:
-                data['dates'].append({"date": str(date), "desc": desc})
+                data['dates'].append({"date": str(date), "desc": desc, "replies": []})
                 save_data(data)
                 st.success("Date added!")
                 st.rerun()
@@ -143,6 +265,33 @@ def main():
                     data['dates'].remove(d)
                     save_data(data)
                     st.rerun()
+            
+            col_reply, col_space = st.columns([0.15, 0.85])
+            with col_reply:
+                if st.button("💬", key=f"reply_date_{i}"):
+                    st.session_state[f"reply_date_{i}"] = not st.session_state.get(f"reply_date_{i}", False)
+            
+            if st.session_state.get(f"reply_date_{i}", False):
+                reply_text = st.text_input("Add a reply", key=f"reply_input_date_{i}")
+                if st.button("Send Reply", key=f"send_reply_date_{i}"):
+                    if reply_text:
+                        d['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                        save_data(data)
+                        st.rerun()
+            
+            if d.get('replies', []):
+                st.caption("Replies:")
+                for j, reply in enumerate(d['replies']):
+                    col1, col2 = st.columns([0.85, 0.15])
+                    with col1:
+                        st.write(f"💭 {reply['text']}")
+                        st.caption(f"_{reply['date']}_")
+                    with col2:
+                        if st.button("🗑️", key=f"delete_reply_date_{i}_{j}"):
+                            d['replies'].pop(j)
+                            save_data(data)
+                            st.rerun()
+            st.divider()
 
     with tab5:
         st.header("Relationship Timeline")
@@ -150,7 +299,7 @@ def main():
         event_desc = st.text_area("Event Description", key="timeline_desc")
         if st.button("Add Event"):
             if event_desc:
-                data['timeline'].append({"date": str(event_date), "desc": event_desc})
+                data['timeline'].append({"date": str(event_date), "desc": event_desc, "replies": []})
                 save_data(data)
                 st.success("Event added!")
                 st.rerun()
@@ -165,6 +314,32 @@ def main():
                     data['timeline'].remove(event)
                     save_data(data)
                     st.rerun()
+            
+            col_reply, col_space = st.columns([0.15, 0.85])
+            with col_reply:
+                if st.button("💬", key=f"reply_timeline_{i}"):
+                    st.session_state[f"reply_timeline_{i}"] = not st.session_state.get(f"reply_timeline_{i}", False)
+            
+            if st.session_state.get(f"reply_timeline_{i}", False):
+                reply_text = st.text_input("Add a reply", key=f"reply_input_timeline_{i}")
+                if st.button("Send Reply", key=f"send_reply_timeline_{i}"):
+                    if reply_text:
+                        event['replies'].append({"text": reply_text, "date": str(datetime.now())})
+                        save_data(data)
+                        st.rerun()
+            
+            if event.get('replies', []):
+                st.caption("Replies:")
+                for j, reply in enumerate(event['replies']):
+                    col1, col2 = st.columns([0.85, 0.15])
+                    with col1:
+                        st.write(f"💭 {reply['text']}")
+                        st.caption(f"_{reply['date']}_")
+                    with col2:
+                        if st.button("🗑️", key=f"delete_reply_timeline_{i}_{j}"):
+                            event['replies'].pop(j)
+                            save_data(data)
+                            st.rerun()
             st.divider()
 
     with tab6:
