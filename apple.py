@@ -3,6 +3,7 @@ import json
 import os
 import random
 import base64
+import subprocess
 from datetime import datetime
 
 DATA_FILE = 'data.json'
@@ -13,9 +14,22 @@ def load_data():
             return json.load(f)
     return {"notes": [], "dates": [], "timeline": [], "photos": [], "voices": []}
 
+def commit_and_push():
+    """Commit and push changes to GitHub"""
+    try:
+        subprocess.run(['git', 'add', DATA_FILE], check=True, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', 'Update data'], check=True, capture_output=True)
+        subprocess.run(['git', 'push'], check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        # Silently fail if git operations fail (e.g., no changes to commit)
+        pass
+    except Exception:
+        pass
+
 def save_data(data):
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=4)
+    commit_and_push()
 
 def main():
     st.title("jorge & aliah💕")
