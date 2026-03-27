@@ -51,12 +51,18 @@ def main():
 
         cols = st.columns(3)
         for i, photo in enumerate(data['photos']):
-            if isinstance(photo, str):  # old path
-                if os.path.exists(photo):
-                    cols[i % 3].image(photo, caption=f"Photo {i+1}")
-            else:  # new dict
-                decoded = base64.b64decode(photo['data'])
-                cols[i % 3].image(decoded, caption=photo['name'])
+            with cols[i % 3]:
+                if isinstance(photo, str):  # old path
+                    if os.path.exists(photo):
+                        st.image(photo, caption=f"Photo {i+1}")
+                else:  # new dict
+                    decoded = base64.b64decode(photo['data'])
+                    st.image(decoded, caption=photo['name'])
+                
+                if st.button("🗑️ Delete", key=f"delete_photo_{i}"):
+                    data['photos'].pop(i)
+                    save_data(data)
+                    st.rerun()
 
     with tab2:
         st.header("Notes")
@@ -69,8 +75,15 @@ def main():
                 st.rerun()
 
         st.subheader("Your Notes")
-        for note in reversed(data['notes']):
-            st.write(f"**{note['date']}**: {note['text']}")
+        for i, note in enumerate(reversed(data['notes'])):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
+                st.write(f"**{note['date']}**: {note['text']}")
+            with col2:
+                if st.button("🗑️", key=f"delete_note_{i}"):
+                    data['notes'].pop(len(data['notes']) - 1 - i)
+                    save_data(data)
+                    st.rerun()
             st.divider()
 
     with tab3:
@@ -84,15 +97,29 @@ def main():
             st.success("Voice message uploaded!")
 
         st.subheader("Voice Messages")
-        for voice in reversed(data['voices']):
+        for i, voice in enumerate(reversed(data['voices'])):
             if isinstance(voice, dict) and 'data' in voice:
                 decoded = base64.b64decode(voice['data'])
                 st.audio(decoded, format='audio/mp3')
-                st.write(f"Uploaded on: {voice['date']}")
+                col1, col2 = st.columns([0.9, 0.1])
+                with col1:
+                    st.write(f"Uploaded on: {voice['date']}")
+                with col2:
+                    if st.button("🗑️", key=f"delete_voice_{i}"):
+                        data['voices'].pop(len(data['voices']) - 1 - i)
+                        save_data(data)
+                        st.rerun()
             elif isinstance(voice, dict) and 'path' in voice:
                 if os.path.exists(voice['path']):
                     st.audio(voice['path'], format='audio/mp3')
-                    st.write(f"Uploaded on: {voice['date']}")
+                    col1, col2 = st.columns([0.9, 0.1])
+                    with col1:
+                        st.write(f"Uploaded on: {voice['date']}")
+                    with col2:
+                        if st.button("🗑️", key=f"delete_voice_path_{i}"):
+                            data['voices'].pop(len(data['voices']) - 1 - i)
+                            save_data(data)
+                            st.rerun()
             st.divider()
 
     with tab4:
@@ -107,8 +134,15 @@ def main():
                 st.rerun()
 
         st.subheader("Important Dates")
-        for d in sorted(data['dates'], key=lambda x: x['date']):
-            st.write(f"**{d['date']}**: {d['desc']}")
+        for i, d in enumerate(sorted(data['dates'], key=lambda x: x['date'])):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
+                st.write(f"**{d['date']}**: {d['desc']}")
+            with col2:
+                if st.button("🗑️", key=f"delete_date_{i}"):
+                    data['dates'].remove(d)
+                    save_data(data)
+                    st.rerun()
 
     with tab5:
         st.header("Relationship Timeline")
@@ -122,8 +156,15 @@ def main():
                 st.rerun()
 
         st.subheader("Timeline")
-        for event in sorted(data['timeline'], key=lambda x: x['date']):
-            st.write(f"**{event['date']}**: {event['desc']}")
+        for i, event in enumerate(sorted(data['timeline'], key=lambda x: x['date'])):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
+                st.write(f"**{event['date']}**: {event['desc']}")
+            with col2:
+                if st.button("🗑️", key=f"delete_timeline_{i}"):
+                    data['timeline'].remove(event)
+                    save_data(data)
+                    st.rerun()
             st.divider()
 
     with tab6:
