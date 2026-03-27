@@ -21,7 +21,6 @@ def load_data():
     data.setdefault("timeline", [])
     data.setdefault("photos", [])
     data.setdefault("voices", [])
-    data.setdefault("letters", [])
     data.setdefault("bucket_list", [])
 
     # Backfill missing fields on existing items
@@ -34,8 +33,6 @@ def load_data():
     for voice in data["voices"]:
         if isinstance(voice, dict):
             voice.setdefault("favourited", False)
-    for letter in data["letters"]:
-        letter.setdefault("favourited", False)
 
     return data
 
@@ -88,9 +85,9 @@ def main():
     data = load_data()
     data = ensure_replies(data)
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Photos", "Notes", "Voice Messages", "Timeline",
-        "💌 Love Letters", "🪣 Bucket List", "Shuffle Memory"
+        "Bucket List", "Shuffle Memory"
     ])
 
     # ─── PHOTOS ───────────────────────────────────────────────
@@ -332,7 +329,7 @@ def main():
                             st.rerun()
             st.divider()
 
-    with tab5:
+    with tab4:
         st.header("Relationship Timeline")
         event_date = st.date_input("Event Date", key="timeline_date")
         event_desc = st.text_area("Event Description", key="timeline_desc")
@@ -381,53 +378,11 @@ def main():
                             st.rerun()
             st.divider()
 
-    # ─── LOVE LETTERS ─────────────────────────────────────────
-    with tab5:
-        st.header("💌 Love Letters")
-        sender = st.text_input("From", placeholder="Your name")
-        letter_body = st.text_area("Write your letter...")
-        if st.button("Send Letter 💌"):
-            if sender and letter_body:
-                data['letters'].append({
-                    "from": sender,
-                    "text": letter_body,
-                    "date": str(datetime.now()),
-                    "favourited": False
-                })
-                save_data(data)
-                st.success("Letter sent! 💕")
-                st.rerun()
-            else:
-                st.warning("Fill in both your name and the letter first.")
-
-        st.subheader("Letters")
-        for i, letter in reversed(list(enumerate(data['letters']))):
-            fav_icon = "❤️" if letter.get("favourited") else "🤍"
-            with st.container():
-                st.markdown(f"""
-<div style="background-color:#fff0f3;border-radius:12px;padding:16px;margin-bottom:8px;border:1px solid #ffb3c1;">
-<strong>💌 From {letter['from']}</strong> &nbsp;&nbsp; <small>{letter['date']}</small>
-<hr style="border:none;border-top:1px solid #ffb3c1;margin:8px 0;">
-{letter['text']}
-</div>
-""", unsafe_allow_html=True)
-                col_fav, col_del = st.columns(2)
-                with col_fav:
-                    if st.button(fav_icon, key=f"fav_letter_{i}"):
-                        data['letters'][i]['favourited'] = not letter.get("favourited", False)
-                        save_data(data)
-                        st.rerun()
-                with col_del:
-                    if st.button("Delete", key=f"del_letter_{i}"):
-                        data['letters'].pop(i)
-                        save_data(data)
-                        st.rerun()
-
     # ─── BUCKET LIST ──────────────────────────────────────────
-    with tab6:
-        st.header("🪣 Bucket List")
+    with tab5:
+        st.header("Bucket List")
         new_item = st.text_input("Add something to your bucket list")
-        if st.button("Add ✨"):
+        if st.button("Add "):
             if new_item:
                 data['bucket_list'].append({
                     "text": new_item,
@@ -466,7 +421,7 @@ def main():
             st.divider()
 
     # ─── SHUFFLE MEMORY ───────────────────────────────────────
-    with tab7:
+    with tab6:
         st.header("Shuffle Memory")
         if st.button("Shuffle!"):
             all_memories = []
@@ -478,8 +433,6 @@ def main():
                 all_memories.append({"type": "voice", "content": voice})
             for event in data['timeline']:
                 all_memories.append({"type": "timeline", "content": event})
-            for letter in data['letters']:
-                all_memories.append({"type": "letter", "content": letter})
 
             if all_memories:
                 memory = random.choice(all_memories)
@@ -505,9 +458,6 @@ def main():
                             st.write(f"Voice from: {memory['content']['date']}")
                 elif memory['type'] == 'timeline':
                     st.write(f"Timeline Event: {memory['content']['date']} - {memory['content']['desc']}")
-                elif memory['type'] == 'letter':
-                    st.write(f"💌 Letter from {memory['content']['from']}: {memory['content']['text']}")
-                    st.write(f"Date: {memory['content']['date']}")
             else:
                 st.write("No memories yet!")
 
