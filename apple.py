@@ -50,6 +50,13 @@ def save_data(data):
         json.dump(data, f, indent=4)
     commit_and_push()
 
+def reply_form_open(key):
+    return st.session_state.get(f"show_{key}", False)
+
+def toggle_reply_form(key):
+    state_key = f"show_{key}"
+    st.session_state[state_key] = not st.session_state.get(state_key, False)
+
 def main():
     st.title("jorge & aliah💕")
 
@@ -86,10 +93,10 @@ def main():
                         save_data(data)
                         st.rerun()
                 with col_reply:
-                    if st.button("💬", key=f"reply_photo_{i}"):
-                        st.session_state[f"reply_photo_{i}"] = not st.session_state.get(f"reply_photo_{i}", False)
+                    if st.button("💬", key=f"reply_photo_button_{i}"):
+                        toggle_reply_form(f"reply_photo_{i}")
                 
-                if st.session_state.get(f"reply_photo_{i}", False):
+                if reply_form_open(f"reply_photo_{i}"):
                     reply_text = st.text_input("Add a reply", key=f"reply_input_photo_{i}")
                     if st.button("Send Reply", key=f"send_reply_photo_{i}"):
                         if reply_text:
@@ -134,10 +141,10 @@ def main():
             note_idx = len(data['notes']) - 1 - i
             col_reply, col_space = st.columns([0.15, 0.85])
             with col_reply:
-                if st.button("💬", key=f"reply_note_{i}"):
-                    st.session_state[f"reply_note_{i}"] = not st.session_state.get(f"reply_note_{i}", False)
+                if st.button("💬", key=f"reply_note_button_{i}"):
+                    toggle_reply_form(f"reply_note_{i}")
             
-            if st.session_state.get(f"reply_note_{i}", False):
+            if reply_form_open(f"reply_note_{i}"):
                 reply_text = st.text_input("Add a reply", key=f"reply_input_note_{i}")
                 if st.button("Send Reply", key=f"send_reply_note_{i}"):
                     if reply_text:
@@ -179,15 +186,15 @@ def main():
                 with col1:
                     st.write(f"Uploaded on: {voice['date']}")
                 with col2:
-                    if st.button("💬", key=f"reply_voice_{i}"):
-                        st.session_state[f"reply_voice_{i}"] = not st.session_state.get(f"reply_voice_{i}", False)
+                    if st.button("💬", key=f"reply_voice_button_{i}"):
+                        toggle_reply_form(f"reply_voice_{i}")
                 with col3:
                     if st.button("🗑️", key=f"delete_voice_{i}"):
                         data['voices'].pop(voice_idx)
                         save_data(data)
                         st.rerun()
                 
-                if st.session_state.get(f"reply_voice_{i}", False):
+                if reply_form_open(f"reply_voice_{i}"):
                     reply_text = st.text_input("Add a reply", key=f"reply_input_voice_{i}")
                     if st.button("Send Reply", key=f"send_reply_voice_{i}"):
                         if reply_text:
@@ -214,15 +221,15 @@ def main():
                     with col1:
                         st.write(f"Uploaded on: {voice['date']}")
                     with col2:
-                        if st.button("💬", key=f"reply_voice_path_{i}"):
-                            st.session_state[f"reply_voice_path_{i}"] = not st.session_state.get(f"reply_voice_path_{i}", False)
+                        if st.button("💬", key=f"reply_voice_path_button_{i}"):
+                            toggle_reply_form(f"reply_voice_path_{i}")
                     with col3:
                         if st.button("🗑️", key=f"delete_voice_path_{i}"):
                             data['voices'].pop(voice_idx)
                             save_data(data)
                             st.rerun()
                     
-                    if st.session_state.get(f"reply_voice_path_{i}", False):
+                    if reply_form_open(f"reply_voice_path_{i}"):
                         reply_text = st.text_input("Add a reply", key=f"reply_input_voice_path_{i}")
                         if st.button("Send Reply", key=f"send_reply_voice_path_{i}"):
                             if reply_text:
@@ -268,10 +275,10 @@ def main():
             
             col_reply, col_space = st.columns([0.15, 0.85])
             with col_reply:
-                if st.button("💬", key=f"reply_date_{i}"):
-                    st.session_state[f"reply_date_{i}"] = not st.session_state.get(f"reply_date_{i}", False)
+                if st.button("💬", key=f"reply_date_button_{i}"):
+                    toggle_reply_form(f"reply_date_{i}")
             
-            if st.session_state.get(f"reply_date_{i}", False):
+            if reply_form_open(f"reply_date_{i}"):
                 reply_text = st.text_input("Add a reply", key=f"reply_input_date_{i}")
                 if st.button("Send Reply", key=f"send_reply_date_{i}"):
                     if reply_text:
@@ -317,10 +324,10 @@ def main():
             
             col_reply, col_space = st.columns([0.15, 0.85])
             with col_reply:
-                if st.button("💬", key=f"reply_timeline_{i}"):
-                    st.session_state[f"reply_timeline_{i}"] = not st.session_state.get(f"reply_timeline_{i}", False)
+                if st.button("💬", key=f"reply_timeline_button_{i}"):
+                    toggle_reply_form(f"reply_timeline_{i}")
             
-            if st.session_state.get(f"reply_timeline_{i}", False):
+            if reply_form_open(f"reply_timeline_{i}"):
                 reply_text = st.text_input("Add a reply", key=f"reply_input_timeline_{i}")
                 if st.button("Send Reply", key=f"send_reply_timeline_{i}"):
                     if reply_text:
