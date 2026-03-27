@@ -11,8 +11,33 @@ DATA_FILE = 'data.json'
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r') as f:
-            return json.load(f)
-    return {"notes": [], "dates": [], "timeline": [], "photos": [], "voices": []}
+            data = json.load(f)
+    else:
+        data = {}
+
+    # Ensure all top-level keys exist
+    data.setdefault("notes", [])
+    data.setdefault("dates", [])
+    data.setdefault("timeline", [])
+    data.setdefault("photos", [])
+    data.setdefault("voices", [])
+    data.setdefault("letters", [])
+    data.setdefault("bucket_list", [])
+
+    # Backfill missing fields on existing items
+    for note in data["notes"]:
+        note.setdefault("favourited", False)
+        note.setdefault("pinned", False)
+    for photo in data["photos"]:
+        if isinstance(photo, dict):
+            photo.setdefault("favourited", False)
+    for voice in data["voices"]:
+        if isinstance(voice, dict):
+            voice.setdefault("favourited", False)
+    for letter in data["letters"]:
+        letter.setdefault("favourited", False)
+
+    return data
 
 def ensure_replies(data):
     """Ensure all items have replies array for backwards compatibility"""
@@ -63,8 +88,12 @@ def main():
     data = load_data()
     data = ensure_replies(data)
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Photos", "Notes", "Voice Messages", "Important Dates", "Timeline", "Shuffle Memory"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "Photos", "Notes", "Voice Messages", "Timeline",
+        "💌 Love Letters", "🪣 Bucket List", "Shuffle Memory"
+    ])
 
+    # ─── PHOTOS ───────────────────────────────────────────────
     with tab1:
         st.header("Photos")
         uploaded_files = st.file_uploader("Upload photos", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
@@ -117,6 +146,7 @@ def main():
                                 save_data(data)
                                 st.rerun()
 
+    # ─── NOTES ────────────────────────────────────────────────
     with tab2:
         st.header("Notes")
         new_note = st.text_area("Add a new note")
@@ -166,6 +196,7 @@ def main():
                             st.rerun()
             st.divider()
 
+    # ─── VOICE MESSAGES ───────────────────────────────────────
     with tab3:
         st.header("Voice Messages")
         uploaded_voice = st.file_uploader("Upload voice message", type=['mp3', 'wav', 'm4a'])
@@ -251,6 +282,7 @@ def main():
                                     st.rerun()
             st.divider()
 
+    # ─── TIMELINE ─────────────────────────────────────────────
     with tab4:
         st.header("Important Dates")
         date = st.date_input("Date")
@@ -349,7 +381,92 @@ def main():
                             st.rerun()
             st.divider()
 
+    # ─── LOVE LETTERS ─────────────────────────────────────────
+    with tab5:
+        st.header("💌 Love Letters")
+        sender = st.text_input("From", placeholder="Your name")
+        letter_body = st.text_area("Write your letter...")
+        if st.button("Send Letter 💌"):
+            if sender and letter_body:
+                data['letters'].append({
+                    "from": sender,
+                    "text": letter_body,
+                    "date": str(datetime.now()),
+                    "favourited": False
+                })
+                save_data(data)
+                st.success("Letter sent! 💕")
+                st.rerun()
+            else:
+                st.warning("Fill in both your name and the letter first.")
+
+        st.subheader("Letters")
+        for i, letter in reversed(list(enumerate(data['letters']))):
+            fav_icon = "❤️" if letter.get("favourited") else "🤍"
+            with st.container():
+                st.markdown(f"""
+<div style="background-color:#fff0f3;border-radius:12px;padding:16px;margin-bottom:8px;border:1px solid #ffb3c1;">
+<strong>💌 From {letter['from']}</strong> &nbsp;&nbsp; <small>{letter['date']}</small>
+<hr style="border:none;border-top:1px solid #ffb3c1;margin:8px 0;">
+{letter['text']}
+</div>
+""", unsafe_allow_html=True)
+                col_fav, col_del = st.columns(2)
+                with col_fav:
+                    if st.button(fav_icon, key=f"fav_letter_{i}"):
+                        data['letters'][i]['favourited'] = not letter.get("favourited", False)
+                        save_data(data)
+                        st.rerun()
+                with col_del:
+                    if st.button("Delete", key=f"del_letter_{i}"):
+                        data['letters'].pop(i)
+                        save_data(data)
+                        st.rerun()
+
+    # ─── BUCKET LIST ──────────────────────────────────────────
     with tab6:
+        st.header("🪣 Bucket List")
+        new_item = st.text_input("Add something to your bucket list")
+        if st.button("Add ✨"):
+            if new_item:
+                data['bucket_list'].append({
+                    "text": new_item,
+                    "done": False,
+                    "date": str(datetime.now())
+                })
+                save_data(data)
+                st.success("Added to your bucket list!")
+                st.rerun()
+            else:
+                st.warning("Type something first!")
+
+        st.subheader("Your List")
+        not_done = [(i, item) for i, item in enumerate(data['bucket_list']) if not item.get('done')]
+        done_items = [(i, item) for i, item in enumerate(data['bucket_list']) if item.get('done')]
+
+        for i, item in not_done + done_items:
+            if item.get('done'):
+                st.markdown(f"~~{item['text']}~~")
+                check_label = "✅"
+            else:
+                st.write(item['text'])
+                check_label = "⬜"
+
+            col_check, col_del = st.columns(2)
+            with col_check:
+                if st.button(check_label, key=f"check_bucket_{i}"):
+                    data['bucket_list'][i]['done'] = not item.get('done', False)
+                    save_data(data)
+                    st.rerun()
+            with col_del:
+                if st.button("Delete", key=f"del_bucket_{i}"):
+                    data['bucket_list'].pop(i)
+                    save_data(data)
+                    st.rerun()
+            st.divider()
+
+    # ─── SHUFFLE MEMORY ───────────────────────────────────────
+    with tab7:
         st.header("Shuffle Memory")
         if st.button("Shuffle!"):
             all_memories = []
@@ -359,10 +476,10 @@ def main():
                 all_memories.append({"type": "note", "content": note})
             for voice in data['voices']:
                 all_memories.append({"type": "voice", "content": voice})
-            for date in data['dates']:
-                all_memories.append({"type": "date", "content": date})
             for event in data['timeline']:
                 all_memories.append({"type": "timeline", "content": event})
+            for letter in data['letters']:
+                all_memories.append({"type": "letter", "content": letter})
 
             if all_memories:
                 memory = random.choice(all_memories)
@@ -386,10 +503,11 @@ def main():
                         if os.path.exists(memory['content']['path']):
                             st.audio(memory['content']['path'])
                             st.write(f"Voice from: {memory['content']['date']}")
-                elif memory['type'] == 'date':
-                    st.write(f"Important Date: {memory['content']['date']} - {memory['content']['desc']}")
                 elif memory['type'] == 'timeline':
                     st.write(f"Timeline Event: {memory['content']['date']} - {memory['content']['desc']}")
+                elif memory['type'] == 'letter':
+                    st.write(f"💌 Letter from {memory['content']['from']}: {memory['content']['text']}")
+                    st.write(f"Date: {memory['content']['date']}")
             else:
                 st.write("No memories yet!")
 
