@@ -2,11 +2,10 @@ import streamlit as st
 import json
 import os
 import random
+import base64
 from datetime import datetime
 
 DATA_FILE = 'data.json'
-PHOTOS_DIR = 'uploads/photos'
-VOICES_DIR = 'uploads/voices'
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -30,18 +29,20 @@ def main():
         uploaded_files = st.file_uploader("Upload photos", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
         if uploaded_files:
             for uploaded_file in uploaded_files:
-                file_path = os.path.join(PHOTOS_DIR, uploaded_file.name)
-                with open(file_path, 'wb') as f:
-                    f.write(uploaded_file.getbuffer())
-                if file_path not in data['photos']:
-                    data['photos'].append(file_path)
+                image_data = uploaded_file.getvalue()
+                encoded = base64.b64encode(image_data).decode('utf-8')
+                data['photos'].append({"name": uploaded_file.name, "data": encoded})
             save_data(data)
             st.success("Photos uploaded!")
 
         cols = st.columns(3)
         for i, photo in enumerate(data['photos']):
-            if os.path.exists(photo):
-                cols[i % 3].image(photo, caption=f"Photo {i+1}")
+            if isinstance(photo, str):  # old path
+                if os.path.exists(photo):
+                    cols[i % 3].image(photo, caption=f"Photo {i+1}")
+            else:  # new dict
+                decoded = base64.b64decode(photo['data'])
+                cols[i % 3].image(decoded, caption=photo['name'])
 
     with tab2:
         st.header("Notes")
@@ -62,19 +63,23 @@ def main():
         st.header("Voice Messages")
         uploaded_voice = st.file_uploader("Upload voice message", type=['mp3', 'wav', 'm4a'])
         if uploaded_voice:
-            file_path = os.path.join(VOICES_DIR, uploaded_voice.name)
-            with open(file_path, 'wb') as f:
-                f.write(uploaded_voice.getbuffer())
-            data['voices'].append({"path": file_path, "name": uploaded_voice.name, "date": str(datetime.now())})
+            audio_data = uploaded_voice.getvalue()
+            encoded = base64.b64encode(audio_data).decode('utf-8')
+            data['voices'].append({"name": uploaded_voice.name, "data": encoded, "date": str(datetime.now())})
             save_data(data)
             st.success("Voice message uploaded!")
 
         st.subheader("Voice Messages")
         for voice in reversed(data['voices']):
-            if os.path.exists(voice['path']):
-                st.audio(voice['path'], format='audio/mp3')
+            if isinstance(voice, dict) and 'data' in voice:
+                decoded = base64.b64decode(voice['data'])
+                st.audio(decoded, format='audio/mp3')
                 st.write(f"Uploaded on: {voice['date']}")
-                st.divider()
+            elif isinstance(voice, dict) and 'path' in voice:
+                if os.path.exists(voice['path']):
+                    st.audio(voice['path'], format='audio/mp3')
+                    st.write(f"Uploaded on: {voice['date']}")
+            st.divider()
 
     with tab4:
         st.header("Important Dates")
@@ -112,7 +117,7 @@ def main():
         if st.button("Shuffle!"):
             all_memories = []
             for photo in data['photos']:
-                all_memories.append({"type": "photo", "path": photo})
+                all_memories.append({"type": "photo", "content": photo})
             for note in data['notes']:
                 all_memories.append({"type": "note", "content": note})
             for voice in data['voices']:
@@ -126,13 +131,24 @@ def main():
                 memory = random.choice(all_memories)
                 st.subheader("Random Memory:")
                 if memory['type'] == 'photo':
-                    st.image(memory['path'])
+                    if isinstance(memory['content'], str):
+                        if os.path.exists(memory['content']):
+                            st.image(memory['content'])
+                    else:
+                        decoded = base64.b64decode(memory['content']['data'])
+                        st.image(decoded, caption=memory['content']['name'])
                 elif memory['type'] == 'note':
                     st.write(f"Note: {memory['content']['text']}")
                     st.write(f"Date: {memory['content']['date']}")
                 elif memory['type'] == 'voice':
-                    st.audio(memory['content']['path'])
-                    st.write(f"Voice from: {memory['content']['date']}")
+                    if isinstance(memory['content'], dict) and 'data' in memory['content']:
+                        decoded = base64.b64decode(memory['content']['data'])
+                        st.audio(decoded)
+                        st.write(f"Voice from: {memory['content']['date']}")
+                    elif isinstance(memory['content'], dict) and 'path' in memory['content']:
+                        if os.path.exists(memory['content']['path']):
+                            st.audio(memory['content']['path'])
+                            st.write(f"Voice from: {memory['content']['date']}")
                 elif memory['type'] == 'date':
                     st.write(f"Important Date: {memory['content']['date']} - {memory['content']['desc']}")
                 elif memory['type'] == 'timeline':
