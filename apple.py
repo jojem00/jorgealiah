@@ -26,14 +26,36 @@ def main():
 
     with tab1:
         st.header("Photos")
-        uploaded_files = st.file_uploader("Upload photos", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                image_data = uploaded_file.getvalue()
-                encoded = base64.b64encode(image_data).decode('utf-8')
-                data['photos'].append({"name": uploaded_file.name, "data": encoded})
-            save_data(data)
-            st.success("Photos uploaded!")
+        uploaded_files = st.file_uploader(
+            "Upload photos",
+            type=['png', 'jpg', 'jpeg'],
+            accept_multiple_files=True,
+            key="photo_uploader"
+        )
+        if st.button("Save Uploaded Photos", key="save_uploaded_photos"):
+            if uploaded_files:
+                existing_photo_data = {
+                    photo['data']
+                    for photo in data['photos']
+                    if isinstance(photo, dict) and 'data' in photo
+                }
+                added_count = 0
+                for uploaded_file in uploaded_files:
+                    image_data = uploaded_file.getvalue()
+                    encoded = base64.b64encode(image_data).decode('utf-8')
+                    if encoded in existing_photo_data:
+                        continue
+                    data['photos'].append({"name": uploaded_file.name, "data": encoded})
+                    existing_photo_data.add(encoded)
+                    added_count += 1
+
+                if added_count > 0:
+                    save_data(data)
+                    st.success(f"Added {added_count} photo(s)!")
+                else:
+                    st.info("Those photos are already in your memories.")
+            else:
+                st.warning("Choose at least one photo first.")
 
         cols = st.columns(3)
         for i, photo in enumerate(data['photos']):
@@ -71,13 +93,29 @@ def main():
 
     with tab3:
         st.header("Voice Messages")
-        uploaded_voice = st.file_uploader("Upload voice message", type=['mp3', 'wav', 'm4a'])
-        if uploaded_voice:
-            audio_data = uploaded_voice.getvalue()
-            encoded = base64.b64encode(audio_data).decode('utf-8')
-            data['voices'].append({"name": uploaded_voice.name, "data": encoded, "date": str(datetime.now())})
-            save_data(data)
-            st.success("Voice message uploaded!")
+        uploaded_voice = st.file_uploader(
+            "Upload voice message",
+            type=['mp3', 'wav', 'm4a'],
+            key="voice_uploader"
+        )
+        if st.button("Save Voice Message", key="save_uploaded_voice"):
+            if uploaded_voice:
+                audio_data = uploaded_voice.getvalue()
+                encoded = base64.b64encode(audio_data).decode('utf-8')
+                existing_voice_data = {
+                    voice['data']
+                    for voice in data['voices']
+                    if isinstance(voice, dict) and 'data' in voice
+                }
+
+                if encoded in existing_voice_data:
+                    st.info("That voice message is already saved.")
+                else:
+                    data['voices'].append({"name": uploaded_voice.name, "data": encoded, "date": str(datetime.now())})
+                    save_data(data)
+                    st.success("Voice message uploaded!")
+            else:
+                st.warning("Choose a voice file first.")
 
         st.subheader("Voice Messages")
         voices_with_index = list(enumerate(data['voices']))
